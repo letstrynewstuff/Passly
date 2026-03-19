@@ -2,7 +2,7 @@
 import express from "express";
 import cors from "cors";
 import fs from "fs";
-import { fileURLToPath } from "url"; 
+import { fileURLToPath } from "url";
 import profileRoutes from "./routes/profile.routes.js";
 import eventRoutes from "./routes/event.routes.js";
 import ticketRoutes from "./routes/ticket.routes.js";
@@ -27,10 +27,8 @@ app.use(cors()); // Enable CORS for all origins (change in production)
 app.use(express.json()); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
 
-
-
 // ===== HEALTH CHECK =====
-app.get("/api/health", (req, res) => {
+app.get("/", (req, res) => {
   res.status(200).json({
     success: true,
     message: "API is running",
