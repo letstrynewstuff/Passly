@@ -25,6 +25,7 @@ import { getUserProfile } from "../api/services/profileApi";
 import { getMyTickets } from "../api/services/ticketApi";
 import ProfileSettings from "../components/ProfileSettings";
 import { getAvatarUrl } from "../utils/avatarUtils";
+import API from "../api/axios";
 
 // ─── Load jsPDF ───────────────────────────────────────────────────────────────
 let jsPDFLib = null;
@@ -45,8 +46,8 @@ const loadJsPDF = () =>
     document.head.appendChild(script);
   });
 
-// ─── Passly branding on canvas ────────────────────────────────────────────────
-const drawPasslyBranding = (ctx, canvasWidth, y) => {
+// ─── Passlly branding on canvas ────────────────────────────────────────────────
+const drawPassllyBranding = (ctx, canvasWidth, y) => {
   ctx.save();
   ctx.textAlign = "center";
   const pillW = 180,
@@ -80,7 +81,7 @@ const drawPasslyBranding = (ctx, canvasWidth, y) => {
   ctx.fillText("Powered by", canvasWidth / 2 - 20, y + 3);
   ctx.fillStyle = "#ffffff";
   ctx.font = "bold 13px Arial";
-  ctx.fillText("Passly", canvasWidth / 2 + 28, y + 3);
+  ctx.fillText("Passlly", canvasWidth / 2 + 28, y + 3);
   ctx.restore();
 };
 
@@ -187,25 +188,46 @@ const Profile = () => {
     }
   };
 
-  const handleResendEmail = async (ticket) => {
-    setEmailSending(ticket._id);
-    try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(
-        `http://localhost:5000/api/tickets/${ticket._id}/resend-email`,
-        { method: "POST", headers: { Authorization: `Bearer ${token}` } },
-      );
-      const data = await res.json();
-      if (data.success) {
-        setEmailSent(ticket._id);
-        setTimeout(() => setEmailSent(null), 3000);
-      }
-    } catch {
-      alert("Failed to send email");
-    } finally {
-      setEmailSending(null);
+  // const handleResendEmail = async (ticket) => {
+  //   setEmailSending(ticket._id);
+  //   try {
+  //     const token = localStorage.getItem("token");
+  //     const res = await fetch(
+  //       `http://localhost:5000/api/tickets/${ticket._id}/resend-email`,
+  //       { method: "POST", headers: { Authorization: `Bearer ${token}` } },
+  //     );
+  //     const data = await res.json();
+  //     if (data.success) {
+  //       setEmailSent(ticket._id);
+  //       setTimeout(() => setEmailSent(null), 3000);
+  //     }
+  //   } catch {
+  //     alert("Failed to send email");
+  //   } finally {
+  //     setEmailSending(null);
+  //   }
+  // };
+
+const handleResendEmail = async (ticket) => {
+  setEmailSending(ticket._id);
+
+  try {
+    const res = await API.post(`/tickets/${ticket._id}/resend-email`);
+
+    if (res.data.success) {
+      setEmailSent(ticket._id);
+      setTimeout(() => setEmailSent(null), 3000);
     }
-  };
+  } catch (err) {
+    console.error(err);
+    alert(err.response?.data?.message || "Failed to send email");
+  } finally {
+    setEmailSending(null);
+  }
+};
+
+
+
 
   const handleDownloadImage = () => {
     const canvas = document.createElement("canvas");
@@ -269,7 +291,7 @@ const Profile = () => {
         ctx.fillStyle = "#7c3aed";
         ctx.font = "bold 13px Arial";
         ctx.fillText(selectedQR.ticketTypeName || "", 200, 485);
-        drawPasslyBranding(ctx, 400, 560);
+        drawPassllyBranding(ctx, 400, 560);
         const link = document.createElement("a");
         link.download = `ticket-${selectedQR.ticketCode || selectedQR._id}.png`;
         link.href = canvas.toDataURL();
@@ -370,7 +392,7 @@ const Profile = () => {
       doc.setFont("helvetica", "normal");
       doc.text("Powered by ", pageW / 2 - 2, 140.5, { align: "right" });
       doc.setFont("helvetica", "bold");
-      doc.text("Passly", pageW / 2 - 1, 140.5, { align: "left" });
+      doc.text("Passlly", pageW / 2 - 1, 140.5, { align: "left" });
       doc.save(`ticket-${selectedQR.ticketCode || selectedQR._id}.pdf`);
     } catch (err) {
       console.error("PDF generation failed:", err);
@@ -716,7 +738,7 @@ const Profile = () => {
                           Present this QR code at the venue entrance
                         </p>
 
-                        {/* Passly pill */}
+                        {/* Passlly pill */}
                         <div
                           className="flex items-center gap-1.5 px-4 py-1.5 rounded-full"
                           style={{
@@ -728,7 +750,7 @@ const Profile = () => {
                             Powered by
                           </span>
                           <span className="text-white text-xs font-black tracking-wider">
-                            Passly
+                            Passlly
                           </span>
                         </div>
                       </div>

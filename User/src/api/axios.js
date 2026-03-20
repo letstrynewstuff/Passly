@@ -1,10 +1,6 @@
 
-
-
 // // src/api/axios.js
-
 // import axios from "axios";
-
 
 // const API = axios.create({
 //   baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api",
@@ -16,7 +12,7 @@
 //   },
 // });
 
-// // Request interceptor (unchanged)
+// // Request interceptor
 // API.interceptors.request.use(
 //   (config) => {
 //     const token = localStorage.getItem("token");
@@ -28,37 +24,46 @@
 //   (error) => Promise.reject(error),
 // );
 
-// // Response interceptor: handle 401 with warning message before redirect
+// // Response interceptor
 // API.interceptors.response.use(
 //   (response) => response,
 //   (error) => {
+//     // 401 — session expired, redirect to login
 //     if (error.response?.status === 401) {
-//       // Show user-friendly message
 //       alert("Session expired. Please log in again.");
-      
 //       localStorage.removeItem("token");
 //       window.location.href = "/login";
+//       return Promise.reject(error); // still reject so callers know
 //     }
 
+//     // No response at all — network error
 //     if (!error.response) {
 //       return Promise.reject({
 //         message: "Network error. Please check your connection.",
 //       });
 //     }
 
-//     return Promise.reject(
-//       error.response?.data || { message: "Something went wrong" },
-//     );
+//     // ✅ Always reject with the full Axios error object
+//     // so catch blocks can access err.response.data, err.response.status, etc.
+//     return Promise.reject(error);
 //   },
 // );
 
 // export default API;
 
+
 // src/api/axios.js
 import axios from "axios";
 
+// ✅ Smart baseURL (env first, fallback to localhost)
+const BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  (import.meta.env.MODE === "development"
+    ? "http://localhost:5000/api"
+    : "https://passly.onrender.com/api");
+
 const API = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api",
+  baseURL: BASE_URL,
   timeout: 15000,
   headers: {
     "Content-Type": "application/json",
@@ -83,23 +88,21 @@ API.interceptors.request.use(
 API.interceptors.response.use(
   (response) => response,
   (error) => {
-    // 401 — session expired, redirect to login
+    // 401 — session expired
     if (error.response?.status === 401) {
       alert("Session expired. Please log in again.");
       localStorage.removeItem("token");
       window.location.href = "/login";
-      return Promise.reject(error); // still reject so callers know
+      return Promise.reject(error);
     }
 
-    // No response at all — network error
+    // Network error
     if (!error.response) {
       return Promise.reject({
         message: "Network error. Please check your connection.",
       });
     }
 
-    // ✅ Always reject with the full Axios error object
-    // so catch blocks can access err.response.data, err.response.status, etc.
     return Promise.reject(error);
   },
 );

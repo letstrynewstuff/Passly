@@ -12,6 +12,7 @@ import publicEventsRoutes from "./routes/events.public.routes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import withdrawalRoutes from "./routes/withdrawal.routes.js";
 import scannerRouter from "./routes/scanner.routes.js";
+import locationRouter from "./routes/location.routes.js";
 
 const app = express();
 
@@ -52,6 +53,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/withdrawals", withdrawalRoutes);
 app.use("/api/scanner", scannerRouter);
+app.use("/api/locations", locationRouter);
 
 // Catch-all at the end
 app.use((req, res) => {
