@@ -13,7 +13,7 @@ export const initializePayment = async (email, amount, metadata) => {
         email,
         amount: amount * 100,
         metadata,
-        callback_url: "http://localhost:5173/checkout",
+        callback_url: "https://passlly.com/checkout",
       }),
     },
   );
