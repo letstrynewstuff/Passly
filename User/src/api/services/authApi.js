@@ -17,3 +17,7 @@ export const scannerLogin = async ({ identifier, password }) => {
   });
   return response.data;
 };
+export const masterScannerLogin = async ({ identifier, password }) => {
+  const res = await API.post("/scanner/master-login", { identifier, password });
+  return res.data;
+};

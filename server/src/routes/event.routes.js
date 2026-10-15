@@ -1,29 +1,4 @@
-// // src/routes/events.routes.js
-// import express from "express";
-// import { authenticateJWT, requireRole } from "../middleware/auth.middleware.js";
-// import {
-//   getAllEvents,
-//   getEventById,
-//   createEvent,
-//   updateEvent,
-//   deleteEvent,
-// } from "../controllers/event.controller.js";
 
-// const router = express.Router();
-
-// // Shortcut middleware for planner-only access
-// const requirePlanner = requireRole(["planner"]);
-
-// // Public routes
-// router.get("/", getAllEvents);
-// router.get("/:id", getEventById);
-
-// // Planner-only routes (protected)
-// router.post("/", authenticateJWT, requirePlanner, createEvent);
-// router.put("/:id", authenticateJWT, requirePlanner, updateEvent);
-// router.delete("/:id", authenticateJWT, requirePlanner, deleteEvent);
-
-// export default router;
 
 // src/routes/events.routes.js
 import express from "express";

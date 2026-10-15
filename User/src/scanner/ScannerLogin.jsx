@@ -1,3 +1,5 @@
+
+
 // // src/pages/ScannerLogin.jsx
 // import { useState } from "react";
 // import { useNavigate } from "react-router-dom";
@@ -19,13 +21,12 @@
 //     try {
 //       const data = await scannerLogin({ identifier, password });
 
-//       // Save token (adjust to match how your app handles auth)
 //       localStorage.setItem("token", data.token);
-//       // optional: localStorage.setItem('role', data.role);
+//       // Clear any previous operator name so the name screen always shows
+//       localStorage.removeItem("scannerUsername");
 
-//       // Optional: if you use context / zustand / redux → dispatch login action here
-
-//       navigate("/scanner"); // or '/scanner-dashboard' / whatever your next page is
+//       // Go to name screen before scanner
+//       navigate("/scanner-name");
 //     } catch (err) {
 //       const msg =
 //         err.response?.data?.message ||
@@ -88,7 +89,7 @@
 //                   required
 //                   value={password}
 //                   onChange={(e) => setPassword(e.target.value)}
-//                   className="appearance-none block w-full px-3 py-2 border border-gray-700 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+//                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
 //                 />
 //               </div>
 //             </div>
@@ -156,7 +157,7 @@
 // src/pages/ScannerLogin.jsx
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { scannerLogin } from "../api/services/authApi";
+import { scannerLogin, masterScannerLogin } from "../api/services/authApi";
 
 export default function ScannerLogin() {
   const navigate = useNavigate();
@@ -166,19 +167,98 @@ export default function ScannerLogin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // const handleSubmit = async (e) => {
+  //   e.preventDefault();
+  //   setError("");
+  //   setLoading(true);
+
+  //   try {
+  //     let data = null;
+
+  //     // 1) Try the master login first. A 401 with isMaster:false means "not the
+  //     //    master ID", so we fall through to the normal planner/admin login.
+  //     try {
+  //       data = await masterScannerLogin({ identifier, password });
+  //     } catch (masterErr) {
+  //       const status = masterErr.response?.status;
+  //       const body = masterErr.response?.data;
+
+  //       // Master ID was typed but the password is wrong or locked out: stop here
+  //       if (body?.isMaster === true) {
+  //         setError(body.message || "Invalid credentials");
+  //         setLoading(false);
+  //         return;
+  //       }
+  //       // Not the master ID, or the master endpoint is unavailable -> normal login
+  //       if (status !== 401 && status !== 404 && masterErr.response) {
+  //         throw masterErr;
+  //       }
+  //     }
+
+  //     // 2) Normal planner/admin login
+  //     if (!data?.token) {
+  //       data = await scannerLogin({ identifier, password });
+  //     }
+
+  //     localStorage.setItem("token", data.token);
+  //     // Clear any previous operator name so the name screen always shows
+  //     localStorage.removeItem("scannerUsername");
+
+  //     // Go to name screen before scanner
+  //     navigate("/scanner-name");
+  //   } catch (err) {
+  //     const msg =
+  //       err.response?.data?.message ||
+  //       err.message ||
+  //       "Login failed. Please check your credentials.";
+  //     setError(msg);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setLoading(true);
 
     try {
-      const data = await scannerLogin({ identifier, password });
+      let data = null;
+      let isMaster = false;
+
+      // 1) Try the master login first.
+      try {
+        data = await masterScannerLogin({ identifier, password });
+        isMaster = true;
+      } catch (masterErr) {
+        const status = masterErr.response?.status;
+        const body = masterErr.response?.data;
+
+        if (body?.isMaster === true) {
+          setError(body.message || "Invalid credentials");
+          setLoading(false);
+          return;
+        }
+        if (status !== 401 && status !== 404 && masterErr.response) {
+          throw masterErr;
+        }
+      }
+
+      // 2) Normal planner/admin login
+      if (!data?.token) {
+        data = await scannerLogin({ identifier, password });
+        isMaster = false;
+      }
+
+      console.log("Scanner login response:", data); // remove once it works
 
       localStorage.setItem("token", data.token);
-      // Clear any previous operator name so the name screen always shows
+      // The master login is treated as admin-level scanner access
+      localStorage.setItem(
+        "scannerRole",
+        isMaster ? "admin" : data.user?.role || data.role || "planner",
+      );
       localStorage.removeItem("scannerUsername");
 
-      // Go to name screen before scanner
       navigate("/scanner-name");
     } catch (err) {
       const msg =
@@ -190,7 +270,6 @@ export default function ScannerLogin() {
       setLoading(false);
     }
   };
-
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
