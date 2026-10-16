@@ -1,4 +1,5 @@
 // // src/controllers/events.controller.js
+
 // import Event from "../models/Event.js";
 // import cloudinary from "../config/cloudinary.js";
 // import fs from "fs/promises";
@@ -25,14 +26,15 @@
 //   try {
 //     const event = await Event.findById(req.params.id).populate(
 //       "createdBy",
-//       "username companyName",
+//       "username companyName"
 //     );
 
-//     if (!event)
+//     if (!event) {
 //       return res.status(404).json({
 //         success: false,
 //         message: "Event not found",
 //       });
+//     }
 
 //     res.status(200).json({ success: true, event });
 //   } catch (error) {
@@ -56,34 +58,39 @@
 //       isPublished,
 //     } = req.body;
 
-//     /* ---- Upload Media to Cloudinary ---- */
+//     /* ---- Upload Media (single file) ---- */
 //     let mediaUrls = [];
 
-//     // if (req.files && req.files.length > 0) 
 //     if (req.file) {
-//       const uploadedMedia = await Promise.all(
-//         req.files.map((file) =>
-//           cloudinary.uploader.upload(file.path, {
-//             folder: "events",
-//           }),
-//         ),
-//       );
+//       const uploaded = await cloudinary.uploader.upload(req.file.path, {
+//         folder: "events",
+//       });
 
-//       // mediaUrls = uploadedMedia.map((file) => file.secure_url);
 //       mediaUrls = [uploaded.secure_url];
 
-//       // remove temp files
-//       await Promise.all(req.files.map((file) => fs.unlink(file.path)));
+//       // delete temp file
+//       await fs.unlink(req.file.path);
 //     }
 
-//     /* ---- Parse JSON fields (because FormData sends strings) ---- */
+//     /* ---- Parse Tags ---- */
 //     const parsedTags = tags
-//       ? tags
-//           .split(",")
-//           .map((t) => t.trim())
-//           .filter(Boolean)
+//       ? tags.split(",").map((t) => t.trim()).filter(Boolean)
 //       : [];
-//     const parsedTickets = ticketCategories ? JSON.parse(ticketCategories) : [];
+
+//     /* ---- Parse Ticket Categories Safely ---- */
+//     let parsedTickets = [];
+
+//     if (ticketCategories) {
+//       try {
+//         parsedTickets = JSON.parse(ticketCategories);
+//         if (!Array.isArray(parsedTickets)) parsedTickets = [];
+//       } catch (err) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Invalid ticketCategories format",
+//         });
+//       }
+//     }
 
 //     const event = await Event.create({
 //       title,
@@ -95,11 +102,13 @@
 //       tags: parsedTags,
 //       ticketCategories: parsedTickets,
 //       createdBy: req.user.id,
-//       isPublished: isPublished === "true",
+//       // isPublished: isPublished === "true",
+//       isPublished: Boolean(req.body.isPublished),
 //     });
 
 //     res.status(201).json({ success: true, event });
 //   } catch (error) {
+//     console.error("CREATE EVENT ERROR:", error);
 //     res.status(500).json({ success: false, message: error.message });
 //   }
 // };
@@ -111,56 +120,54 @@
 //   try {
 //     const event = await Event.findById(req.params.id);
 
-//     if (!event)
+//     if (!event) {
 //       return res.status(404).json({
 //         success: false,
 //         message: "Event not found",
 //       });
+//     }
 
-//     if (event.createdBy.toString() !== req.user.id)
+//     if (event.createdBy.toString() !== req.user.id) {
 //       return res.status(403).json({
 //         success: false,
 //         message: "Not authorized",
 //       });
+//     }
 
 //     /* ---- Upload new media if provided ---- */
 //     let mediaUrls = event.media;
 
-//     // if (req.files && req.files.length > 0) 
 //     if (req.file) {
-//       // const uploadedMedia = await Promise.all(
-//       //   req.files.map((file) =>
-//       //     cloudinary.uploader.upload(file.path, {
-//       //       folder: "events",
-//       //     }),
-//       //   ),
-//       // );
 //       const uploaded = await cloudinary.uploader.upload(req.file.path, {
 //         folder: "events",
 //       });
 
-//       // mediaUrls = [
-//       //   ...mediaUrls,
-//       //   ...uploadedMedia.map((file) => file.secure_url),
-//       // ];
 //       mediaUrls = [uploaded.secure_url];
 
-//       // await Promise.all(req.files.map((file) => fs.unlink(file.path)));
 //       await fs.unlink(req.file.path);
 //     }
 
-//     /* ---- Parse fields ---- */
-//     const parsedTags = tags
-//       ? tags
-//           .split(",")
-//           .map((t) => t.trim())
-//           .filter(Boolean)
-//       : [];
+//     /* ---- Parse Tags ---- */
+//     const parsedTags = req.body.tags
+//       ? req.body.tags.split(",").map((t) => t.trim()).filter(Boolean)
+//       : event.tags;
 
-//     const parsedTickets = req.body.ticketCategories
-//       ? JSON.parse(req.body.ticketCategories)
-//       : event.ticketCategories;
+//     /* ---- Parse Ticket Categories Safely ---- */
+//     let parsedTickets = event.ticketCategories;
 
+//     if (req.body.ticketCategories) {
+//       try {
+//         parsedTickets = JSON.parse(req.body.ticketCategories);
+//         if (!Array.isArray(parsedTickets)) parsedTickets = [];
+//       } catch (err) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Invalid ticketCategories format",
+//         });
+//       }
+//     }
+
+//     /* ---- Update Fields ---- */
 //     event.title = req.body.title || event.title;
 //     event.description = req.body.description || event.description;
 //     event.location = req.body.location || event.location;
@@ -170,14 +177,16 @@
 //     event.ticketCategories = parsedTickets;
 //     event.media = mediaUrls;
 
-//     if (req.body.isPublished !== undefined) {
-//       event.isPublished = req.body.isPublished === "true";
-//     }
+//     // if (req.body.isPublished !== undefined) {
+//     //   event.isPublished = req.body.isPublished === "true";
+//     // }
+//     event.isPublished = Boolean(req.body.isPublished);
 
 //     await event.save();
 
 //     res.status(200).json({ success: true, event });
 //   } catch (error) {
+//     console.error("UPDATE EVENT ERROR:", error);
 //     res.status(500).json({ success: false, message: error.message });
 //   }
 // };
@@ -204,17 +213,19 @@
 //   try {
 //     const event = await Event.findById(req.params.id);
 
-//     if (!event)
+//     if (!event) {
 //       return res.status(404).json({
 //         success: false,
 //         message: "Event not found",
 //       });
+//     }
 
-//     if (event.createdBy.toString() !== req.user.id)
+//     if (event.createdBy.toString() !== req.user.id) {
 //       return res.status(403).json({
 //         success: false,
 //         message: "Not authorized",
 //       });
+//     }
 
 //     await event.deleteOne();
 
@@ -227,240 +238,36 @@
 //   }
 // };
 
-// // import Event from "../models/Event.js";
-// // import cloudinary from "../config/cloudinary.js";
-// // import fs from "fs/promises"; // to remove temp files after upload
-
-// // // Get all events
-// // export const getAllEvents = async (req, res) => {
-// //   try {
-// //     const events = await Event.find({}).populate(
-// //       "createdBy",
-// //       "username companyName",
-// //     );
-// //     res.status(200).json({ success: true, events });
-// //   } catch (error) {
-// //     res.status(500).json({ success: false, message: error.message });
-// //   }
-// // };
-
-// // // Get single event by ID
-// // export const getEventById = async (req, res) => {
-// //   try {
-// //     const event = await Event.findById(req.params.id).populate(
-// //       "createdBy",
-// //       "username companyName",
-// //     );
-// //     if (!event)
-// //       return res
-// //         .status(404)
-// //         .json({ success: false, message: "Event not found" });
-
-// //     res.status(200).json({ success: true, event });
-// //   } catch (error) {
-// //     res.status(500).json({ success: false, message: error.message });
-// //   }
-// // };
-
-// // // Create Event with media upload to Cloudinary
-// // export const createEvent = async (req, res) => {
-// //   try {
-// //     const {
-// //       title,
-// //       description,
-// //       location,
-// //       date,
-// //       time,
-// //       ticketTypes,
-// //       prices,
-// //       totalTickets,
-// //       tags,
-// //     } = req.body;
-
-// //     // Upload files to Cloudinary if any
-// //     let mediaUrls = [];
-// //     if (req.files && req.files.length > 0) {
-// //       const uploadedMedia = await Promise.all(
-// //         req.files.map((file) =>
-// //           cloudinary.uploader.upload(file.path, {
-// //             resource_type: "auto", // handles both images and videos
-// //             folder: "events",
-// //           }),
-// //         ),
-// //       );
-
-// //       mediaUrls = uploadedMedia.map((file) => file.secure_url);
-
-// //       // Remove temporary files after upload
-// //       await Promise.all(req.files.map((file) => fs.unlink(file.path)));
-// //     }
-
-// //     const newEvent = new Event({
-// //       title,
-// //       description,
-// //       location,
-// //       date,
-// //       time,
-// //       media: mediaUrls,
-// //       ticketTypes,
-// //       prices,
-// //       totalTickets,
-// //       tags,
-// //       createdBy: req.user.id,
-// //     });
-
-// //     await newEvent.save();
-// //     res.status(201).json({ success: true, event: newEvent });
-// //   } catch (error) {
-// //     res.status(500).json({ success: false, message: error.message });
-// //   }
-// // };
-
-// // // Update Event with optional media upload
-// // export const updateEvent = async (req, res) => {
-// //   try {
-// //     const event = await Event.findById(req.params.id);
-// //     if (!event)
-// //       return res
-// //         .status(404)
-// //         .json({ success: false, message: "Event not found" });
-
-// //     if (event.createdBy.toString() !== req.user.id)
-// //       return res
-// //         .status(403)
-// //         .json({ success: false, message: "Not authorized to edit this event" });
-
-// //     let mediaUrls = event.media || [];
-
-// //     // Upload new files to Cloudinary if provided
-// //     if (req.files && req.files.length > 0) {
-// //       const uploadedMedia = await Promise.all(
-// //         req.files.map((file) =>
-// //           cloudinary.uploader.upload(file.path, {
-// //             resource_type: "auto",
-// //             folder: "events",
-// //           }),
-// //         ),
-// //       );
-
-// //       mediaUrls = [
-// //         ...mediaUrls,
-// //         ...uploadedMedia.map((file) => file.secure_url),
-// //       ];
-
-// //       // Remove temporary files after upload
-// //       await Promise.all(req.files.map((file) => fs.unlink(file.path)));
-// //     }
-
-// //     const updatedEvent = await Event.findByIdAndUpdate(
-// //       req.params.id,
-// //       { ...req.body, media: mediaUrls },
-// //       { new: true },
-// //     );
-
-// //     res.status(200).json({ success: true, event: updatedEvent });
-// //   } catch (error) {
-// //     res.status(500).json({ success: false, message: error.message });
-// //   }
-// // };
-// // // Get events created by logged-in planner
-// // export const getMyEvents = async (req, res) => {
-// //   try {
-// //     const events = await Event.find({ createdBy: req.user.id })
-// //       .sort({ createdAt: -1 });
-
-// //     res.status(200).json({ success: true, events });
-// //   } catch (error) {
-// //     res.status(500).json({ success: false, message: error.message });
-// //   }
-// // };
-
-// // // Delete Event
-// // export const deleteEvent = async (req, res) => {
-// //   try {
-// //     const event = await Event.findById(req.params.id);
-// //     if (!event)
-// //       return res
-// //         .status(404)
-// //         .json({ success: false, message: "Event not found" });
-
-// //     if (event.createdBy.toString() !== req.user.id)
-// //       return res
-// //         .status(403)
-// //         .json({
-// //           success: false,
-// //           message: "Not authorized to delete this event",
-// //         });
-
-// //     await Event.findByIdAndDelete(req.params.id);
-// //     res.status(200).json({ success: true, message: "Event deleted" });
-// //   } catch (error) {
-// //     res.status(500).json({ success: false, message: error.message });
-// //   }
-// // };
-
-
-// src/controllers/events.controller.js
-
 import Event from "../models/Event.js";
-import cloudinary from "../config/cloudinary.js";
-import fs from "fs/promises";
+import Comment from "../models/Comment.js";
 
-/* =========================
-   GET ALL EVENTS (Published Only)
-========================= */
-export const getAllEvents = async (req, res) => {
-  try {
-    const events = await Event.find({ isPublished: true })
-      .populate("createdBy", "username companyName")
-      .sort({ createdAt: -1 });
+const IMAGE_RE = /\.(jpe?g|png|gif|webp|avif)(\?.*)?$/i;
+const VIDEO_RE = /\.(mp4|webm|mov)(\?.*)?$/i;
 
-    res.status(200).json({ success: true, events });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
+// Public base URL of this server (Render in production, localhost locally)
+const getBase = (req) => {
+  if (process.env.BASE_URL) return process.env.BASE_URL.replace(/\/$/, "");
+  const proto = req.headers["x-forwarded-proto"]?.split(",")[0] || req.protocol;
+  return `${proto}://${req.get("host")}`;
 };
 
-// export const getAllEvents = async (req, res) => {
-//   try {
-//     const allEvents = await Event.find();
-//     console.log("ALL EVENTS IN DB:", allEvents);
+// Seeded URLs were saved with http://localhost:5000, so point them at this server
+const fixUrl = (url, base) =>
+  typeof url === "string"
+    ? url.replace(/^https?:\/\/localhost:\d+/i, base)
+    : url;
 
-//     const events = await Event.find({ isPublished: true });
-//     console.log("PUBLISHED EVENTS:", events);
-
-//     res.status(200).json({ success: true, events });
-//   } catch (error) {
-//     console.log("ERROR:", error);
-//     res.status(500).json({ success: false, message: error.message });
-//   }
-// };
-/* =========================
-   GET SINGLE EVENT
-========================= */
-export const getEventById = async (req, res) => {
-  try {
-    const event = await Event.findById(req.params.id).populate(
-      "createdBy",
-      "username companyName"
-    );
-
-    if (!event) {
-      return res.status(404).json({
-        success: false,
-        message: "Event not found",
-      });
-    }
-
-    res.status(200).json({ success: true, event });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
+const formatEvent = (event, base) => {
+  const media = (event.media || []).map((u) => fixUrl(u, base));
+  return {
+    ...event,
+    media,
+    imageUrl: media.find((u) => IMAGE_RE.test(u)) || null,
+    videoUrl: media.find((u) => VIDEO_RE.test(u)) || null,
+  };
 };
 
-/* =========================
-   CREATE EVENT
-========================= */
+
 export const createEvent = async (req, res) => {
   try {
     const {
@@ -490,7 +297,10 @@ export const createEvent = async (req, res) => {
 
     /* ---- Parse Tags ---- */
     const parsedTags = tags
-      ? tags.split(",").map((t) => t.trim()).filter(Boolean)
+      ? tags
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean)
       : [];
 
     /* ---- Parse Ticket Categories Safely ---- */
@@ -525,6 +335,139 @@ export const createEvent = async (req, res) => {
     res.status(201).json({ success: true, event });
   } catch (error) {
     console.error("CREATE EVENT ERROR:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+/* =========================
+   DELETE EVENT
+========================= */
+export const deleteEvent = async (req, res) => {
+  try {
+    const event = await Event.findById(req.params.id);
+
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        message: "Event not found",
+      });
+    }
+
+    if (event.createdBy.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized",
+      });
+    }
+
+    await event.deleteOne();
+
+    res.status(200).json({
+      success: true,
+      message: "Event deleted",
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// GET /api/events - Public event feed
+export const getPublicEvents = async (req, res) => {
+  try {
+    const base = getBase(req);
+
+    const events = await Event.find({ isPublished: true, status: "approved" })
+      .select(
+        "_id title description date time location media ticketCategories createdAt",
+      )
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Comment counts for every event in one query (so counts show without opening comments)
+    const counts = await Comment.aggregate([
+      { $match: { event: { $in: events.map((e) => e._id) } } },
+      { $group: { _id: "$event", count: { $sum: 1 } } },
+    ]);
+    const countMap = new Map(counts.map((c) => [String(c._id), c.count]));
+
+    const formattedEvents = events.map((event) => ({
+      ...formatEvent(event, base),
+      commentCount: countMap.get(String(event._id)) || 0,
+    }));
+
+    res.status(200).json({
+      success: true,
+      count: formattedEvents.length,
+      events: formattedEvents,
+    });
+  } catch (error) {
+    console.error("Get public events error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+/* =========================
+   GET ALL EVENTS 
+========================= */
+// export const getAllEvents = async (req, res) => {
+//   try {
+//     const events = await Event.find({ isPublished: true })
+//       .populate("createdBy", "username companyName")
+//       .sort({ createdAt: -1 });
+
+//     res.status(200).json({ success: true, events });
+//   } catch (error) {
+//     res.status(500).json({ success: false, message: error.message });
+//   }
+// };
+
+/* =========================
+   GET ALL EVENTS
+========================= */
+export const getAllEvents = async (req, res) => {
+  try {
+    const base = getBase(req);
+
+    const events = await Event.find({ isPublished: true })
+      .populate("createdBy", "username companyName")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Add image URLs and a comment count to every event
+    const formattedEvents = await Promise.all(
+      events.map(async (event) => ({
+        ...formatEvent(event, base),
+        commentCount: await Comment.countDocuments({ event: event._id }),
+      })),
+    );
+
+    res.status(200).json({
+      success: true,
+      count: formattedEvents.length,
+      events: formattedEvents,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+/* =========================
+   GET SINGLE EVENT
+========================= */
+export const getEventById = async (req, res) => {
+  try {
+    const event = await Event.findById(req.params.id).populate(
+      "createdBy",
+      "username companyName"
+    );
+
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        message: "Event not found",
+      });
+    }
+
+    res.status(200).json({ success: true, event });
+  } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -622,34 +565,56 @@ export const getMyEvents = async (req, res) => {
   }
 };
 
-/* =========================
-   DELETE EVENT
-========================= */
-export const deleteEvent = async (req, res) => {
+// GET /api/events/:id - Public event details
+export const getPublicEventById = async (req, res) => {
   try {
-    const event = await Event.findById(req.params.id);
+    const event = await Event.findById(req.params.id)
+      .select(
+        "title description date time location media ticketCategories createdAt",
+      )
+      .lean();
 
     if (!event) {
-      return res.status(404).json({
-        success: false,
-        message: "Event not found",
-      });
+      return res
+        .status(404)
+        .json({ success: false, message: "Event not found" });
     }
-
-    if (event.createdBy.toString() !== req.user.id) {
-      return res.status(403).json({
-        success: false,
-        message: "Not authorized",
-      });
-    }
-
-    await event.deleteOne();
 
     res.status(200).json({
       success: true,
-      message: "Event deleted",
+      event: formatEvent(event, getBase(req)),
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Get event by ID error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// GET /api/events/:id/comments - Public comments for an event
+export const getEventComments = async (req, res) => {
+  try {
+    const { id: eventId } = req.params;
+
+    const eventExists = await Event.exists({ _id: eventId });
+    if (!eventExists) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Event not found" });
+    }
+
+    const comments = await Comment.find({ event: eventId })
+      .populate("user", "username profileImage")
+      .select("content createdAt user")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.status(200).json({
+      success: true,
+      count: comments.length,
+      comments,
+    });
+  } catch (error) {
+    console.error("Get event comments error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };
